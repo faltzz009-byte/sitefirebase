@@ -534,44 +534,70 @@ function atualizarContador() {
 function openBrand(brand) {
     const title = document.getElementById('panelTitle');
     const body = document.getElementById('panelBody');
-    
-    const fixos = produtosPorMarca[brand] || [];
-    const bancoNovos = JSON.parse(localStorage.getItem('meusProdutos') || '[]');
-    const novosFiltrados = bancoNovos.filter(p => p.marca.toUpperCase() === brand.toUpperCase());
-    const listaGeral = [...fixos, ...novosFiltrados];
 
     title.innerText = brand;
     body.innerHTML = '<div class="vitrine-fluxo" id="vitrineGeneric"></div>';
+
     const container = document.getElementById('vitrineGeneric');
+    container.innerHTML = '<p style="color:#fff;padding:40px">Carregando...</p>';
 
-    listaGeral.forEach(p => {
-        const imgPrincipal = p.img || (p.imagens ? p.imagens[0] : '');
-        
-        // Lógica para garantir que o precoPix exista e seja menor
-        let valorPix = p.precoPix;
-        if (!valorPix) {
-            // Se não houver precoPix, tira o "R$", calcula 10% de desconto e formata de volta
-            let numPreco = parseFloat(p.preco.replace('R$', '').replace('.', '').replace(',', '.'));
-            valorPix = (numPreco * 0.9).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-        }
+    db.collection("produtos")
+        .where("marca", "==", brand)
+        .get()
+        .then(snapshot => {
 
-        const produtoData = {...p, precoPix: valorPix};
-        const data = JSON.stringify(produtoData).replace(/"/g, '&quot;');
+            container.innerHTML = '';
 
-        container.innerHTML += `
-            <div class="card-soft" onclick="openProductModal(${data})" style="border-radius:15 !important;">
-                <div class="img-container" style="border-radius:15 !important;">
-                    <img src="${imgPrincipal}" style="border-radius:15 !important; object-fit: cover;">
-                </div>
-                <span class="prod-nome" style="text-transform: uppercase;">${p.nome}</span>
-                <div style="display: flex; flex-direction: column; gap: 2px;">
-                    <span class="prod-preco" style="text-decoration: line-through; font-size: 10px; opacity: 0.6;">${p.preco}</span>
-                    <span class="prod-preco-pix" style="color: #28a745; font-size: 14px; font-weight: 900;">${valorPix} no PIX</span>
-                </div>
-            </div>`;
-    });
-    showPanel();
+            if (snapshot.empty) {
+                container.innerHTML = `
+                    <div style="color:#fff;font-weight:800;padding:40px">
+                        Nenhum produto encontrado
+                    </div>`;
+                showPanel();
+                return;
+            }
+
+            snapshot.forEach(doc => {
+                const p = doc.data();
+                const imgPrincipal = p.img || (p.imagens ? p.imagens[0] : '');
+
+                // 🔥 GARANTE PREÇO PIX
+                let valorPix = p.precoPix;
+                if (!valorPix && p.preco) {
+                    let numPreco = parseFloat(
+                        p.preco.replace('R$', '').replace(/\./g, '').replace(',', '.')
+                    );
+                    valorPix = (numPreco * 0.9).toLocaleString(
+                        'pt-BR',
+                        { style: 'currency', currency: 'BRL' }
+                    );
+                }
+
+                const produtoData = { ...p, precoPix: valorPix };
+                const data = JSON.stringify(produtoData).replace(/"/g, '&quot;');
+
+                container.innerHTML += `
+                    <div class="card-soft" onclick="openProductModal(${data})" style="border-radius:15 !important;">
+                        <div class="img-container" style="border-radius:15 !important;">
+                            <img src="${imgPrincipal}" style="border-radius:15 !important; object-fit: cover;">
+                        </div>
+                        <span class="prod-nome" style="text-transform: uppercase;">${p.nome}</span>
+                        <div style="display: flex; flex-direction: column; gap: 2px;">
+                            <span class="prod-preco" style="text-decoration: line-through; font-size: 10px; opacity: 0.6;">
+                                ${p.preco}
+                            </span>
+                            <span class="prod-preco-pix" style="color: #28a745; font-size: 14px; font-weight: 900;">
+                                ${valorPix} no PIX
+                            </span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            showPanel();
+        });
 }
+
 function abrirTodasRoupas() {
     const title = document.getElementById('panelTitle');
     const body = document.getElementById('panelBody');
@@ -2069,3 +2095,4 @@ console.log("🔥 Firebase conectado com sucesso");
 </body>
 
 </html>
+
